@@ -23,6 +23,7 @@ public final class ACStore {
     public private(set) var deviceCapabilities: ACCapabilities = .fallback
     public private(set) var connection: ConnectionState = .loading
     public private(set) var device: ThinQDevice?
+    public private(set) var devices: [ThinQDevice] = []
     public private(set) var isSending = false
     /// A short-lived error to show in the footer, e.g. a rejected command.
     public private(set) var transientMessage: String?
@@ -57,6 +58,8 @@ public final class ACStore {
     /// state is read a few more times, stopping as soon as the target moves.
     static let ecoFollowUpDelays: [Duration] = [.seconds(3), .seconds(3), .seconds(4)]
     static let messageDuration: Duration = .seconds(4)
+    /// How often a unit switch checks whether the read for the previous unit has finished.
+    static let switchPollInterval: Duration = .milliseconds(50)
     /// Waits before each retry of a read that failed in a way that may pass on its own.
     static let readRetryDelays: [Duration] = [.milliseconds(500), .milliseconds(1500)]
     /// Consecutive failed refreshes before the UI says the connection is lost.
@@ -112,7 +115,7 @@ public final class ACStore {
     /// A store with fixed data that never touches the network, for snapshots.
     public init(
         previewStatus: ACStatus?, capabilities: ACCapabilities, connection: ConnectionState = .connected,
-        availableUpdate: AppUpdate? = nil, isReconnecting: Bool = false
+        availableUpdate: AppUpdate? = nil, isReconnecting: Bool = false, devices: [ThinQDevice]? = nil
     ) {
         // Limits that keep the given capabilities as they are.
         let limits = TemperatureLimits(
@@ -131,10 +134,12 @@ public final class ACStore {
         self.serverStatus = previewStatus
         self.deviceCapabilities = capabilities
         self.connection = connection
-        self.device = ThinQDevice(
+        let preview = ThinQDevice(
             deviceId: "preview",
             deviceInfo: .init(deviceType: "DEVICE_AIR_CONDITIONER", modelName: "RAC_056905_WW", alias: "Ar-condicionado")
         )
+        self.devices = devices ?? [preview]
+        self.device = self.devices.first ?? preview
     }
 
     // MARK: State
@@ -219,6 +224,27 @@ public final class ACStore {
         if isActive { startPolling(immediately: false) }
     }
 
+    /// Makes another air conditioner on the account the active one and reads its state.
+    ///
+    /// Everything tied to the previous unit is dropped on purpose: commands still waiting to be sent and
+    /// optimistic overrides would otherwise be applied to (or shown for) the wrong device.
+    public func selectDevice(id: String) async {
+        guard id != device?.id, let chosen = devices.first(where: { $0.id == id }) else { return }
+        debounceTask?.cancel()
+        refreshSoonTask?.cancel()
+        queue = []
+        overrides = [:]
+        serverStatus = nil
+        deviceCapabilities = .fallback
+        capabilitiesLoaded = false
+        device = chosen
+        settings.deviceID = chosen.id
+        connection = .loading
+        while isRefreshing { await sleep(Self.switchPollInterval) }
+        await refresh()
+        if isActive { startPolling(immediately: false) }
+    }
+
     public func signOut() {
         settings.token = nil
         forgetDevice()
@@ -229,6 +255,7 @@ public final class ACStore {
     private func forgetDevice() {
         settings.deviceID = nil
         device = nil
+        devices = []
         serverStatus = nil
         overrides = [:]
         capabilitiesLoaded = false
@@ -250,11 +277,17 @@ public final class ACStore {
         do {
             let status = try await retryingTransient {
                 let deviceID = try await resolveDevice(client)
+                var capabilities: ACCapabilities?
                 if !capabilitiesLoaded {
-                    deviceCapabilities = try await client.capabilities(deviceID: deviceID)
+                    capabilities = try await client.capabilities(deviceID: deviceID)
+                }
+                let status = try await client.status(deviceID: deviceID)
+                guard device?.id == deviceID else { throw CancellationError() }
+                if let capabilities {
+                    deviceCapabilities = capabilities
                     capabilitiesLoaded = true
                 }
-                return try await client.status(deviceID: deviceID)
+                return status
             }
             serverStatus = status
             pruneOverrides()
@@ -289,6 +322,7 @@ public final class ACStore {
         guard let chosen = devices.first(where: { $0.id == settings.deviceID }) ?? devices.first else {
             throw ThinQError.api(code: "", message: "No air conditioner found on this LG account")
         }
+        self.devices = devices
         device = chosen
         settings.deviceID = chosen.id
         capabilitiesLoaded = false

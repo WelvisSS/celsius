@@ -86,6 +86,14 @@ enum Labels {
         }
     }
 
+    /// The unit's name, with the model added when two units share the same name.
+    static func deviceName(_ device: ThinQDevice, among devices: [ThinQDevice]) -> String {
+        let name = device.displayName
+        let twins = devices.filter { $0.displayName == name }
+        guard twins.count > 1, let model = device.deviceInfo.modelName else { return name }
+        return "\(name) (\(model))"
+    }
+
     static func temperature(_ value: Double?) -> String {
         guard let value else { return "—" }
         return value.rounded() == value ? String(Int(value)) : String(format: "%.1f", value)
