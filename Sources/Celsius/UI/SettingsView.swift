@@ -124,8 +124,8 @@ struct SettingsView: View {
                             else { Text("Connect Daikin") }
                         }
                         .disabled(daikinAddress.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || (daikinKey.isEmpty && !store.hasToken) || isConnecting)
-                        if case .offline = store.connection {
-                            Label("Daikin is unavailable on this local network.", systemImage: "wifi.slash")
+                        if case let .offline(message) = store.connection {
+                            Label(message, systemImage: "wifi.slash")
                                 .font(.system(size: 11))
                                 .foregroundStyle(Theme.warning)
                         }
