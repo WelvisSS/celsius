@@ -61,7 +61,7 @@ struct PopoverView: View {
             }
             MenuRow(title: "Air conditioner settings…", showsBadge: store.availableUpdate != nil) { showingSettings = true }
         }
-        .redacted(reason: status == nil ? .placeholder : [])
+        .redacted(reason: status == nil && store.connection == .loading ? .placeholder : [])
     }
 
     /// Device name and power, with the room temperature below (or what's wrong, when something is).
