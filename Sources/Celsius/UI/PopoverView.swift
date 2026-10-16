@@ -217,6 +217,16 @@ struct PopoverView: View {
                     selection: Binding(get: { status?.swing ?? false }, set: { store.perform(.swing($0)) })
                 )
             }
+            if caps.supportsSleep {
+                pickerRow(
+                    "Sleep timer",
+                    options: [("Off", 0), ("1 hour", 1), ("2 hours", 2), ("4 hours", 4), ("8 hours", 8)],
+                    selection: Binding(
+                        get: { status?.sleepTimerHours ?? 0 },
+                        set: { store.perform(.sleep(hours: $0)) }
+                    )
+                )
+            }
         }
         .disabled(!isOn)
         .opacity(isOn ? 1 : Theme.disabledOpacity)
