@@ -86,6 +86,9 @@ private final class DaikinTCPExchange: @unchecked Sendable {
     private let lock = NSLock()
     private var received = Data()
     private var completed = false
+    // NWConnection callbacks capture this exchange weakly. Keep it alive until a response or timeout
+    // completes the continuation; otherwise the request can remain suspended forever after start().
+    private var keepAlive: DaikinTCPExchange?
     private let maximumBytes = 65_536
 
     init(connection: NWConnection, request: Data, timeout: Duration, continuation: CheckedContinuation<Data, Error>) {
@@ -96,6 +99,7 @@ private final class DaikinTCPExchange: @unchecked Sendable {
     }
 
     func start() {
+        lock.withLock { keepAlive = self }
         connection.stateUpdateHandler = { [weak self] state in
             guard let self else { return }
             switch state {
@@ -147,6 +151,7 @@ private final class DaikinTCPExchange: @unchecked Sendable {
         let shouldFinish = lock.withLock {
             guard !completed else { return false }
             completed = true
+            keepAlive = nil
             return true
         }
         guard shouldFinish else { return }
