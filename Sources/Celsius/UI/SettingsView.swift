@@ -11,6 +11,7 @@ struct SettingsView: View {
     @State private var token = ""
     @State private var daikinAddress = ""
     @State private var daikinKey = ""
+    @State private var daikinName = ""
     @State private var isConnecting = false
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
     @State private var loginError: String?
@@ -108,6 +109,13 @@ struct SettingsView: View {
                             .font(.system(size: 12))
                             .foregroundStyle(Theme.secondaryText)
                             .fixedSize(horizontal: false, vertical: true)
+                        if store.hasToken {
+                            TextField("Device name", text: $daikinName)
+                                .textFieldStyle(.roundedBorder)
+                                .font(.system(size: 12))
+                                .onSubmit { store.setDaikinName(daikinName) }
+                                .onChange(of: daikinName) { _, value in store.setDaikinName(value) }
+                        }
                         TextField("Device IP address", text: $daikinAddress)
                             .textFieldStyle(.roundedBorder)
                             .font(.system(size: 12, design: .monospaced))
@@ -131,12 +139,27 @@ struct SettingsView: View {
                         }
                     }
                 }
-                .onAppear { daikinAddress = store.configuredDaikinAddress ?? daikinAddress }
+                .onAppear {
+                    daikinAddress = store.configuredDaikinAddress ?? daikinAddress
+                    daikinName = store.configuredDaikinName ?? ""
+                }
             }
 
             if store.hasToken {
                 section("Temperature") {
                     temperatureLimits
+                }
+            }
+
+            if let firmwareVersion = store.status?.firmwareVersion {
+                section("Device information") {
+                    HStack {
+                        Text("Firmware")
+                        Spacer()
+                        Text(firmwareVersion)
+                            .foregroundStyle(Theme.secondaryText)
+                    }
+                    .font(.system(size: 12))
                 }
             }
 

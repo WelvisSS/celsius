@@ -101,6 +101,9 @@ public struct ThinQClient: ACProvider {
     }
 
     public func send(_ command: ACCommand, deviceID: String) async throws {
+        if case .powerful = command {
+            throw ThinQError.rejected("Powerful mode is only supported by Daikin.")
+        }
         _ = try await perform("POST", "devices/\(deviceID)/control", body: command.payload)
     }
 

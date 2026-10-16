@@ -73,6 +73,7 @@ public final class KeychainCredentialStorage: CredentialStorage {
 public protocol SettingsStorage: AnyObject {
     var providerKind: ACProviderKind { get set }
     var daikinAddress: String? { get set }
+    var daikinName: String? { get set }
     var daikinKey: String? { get set }
     var token: String? { get set }
     var clientID: String { get }
@@ -101,6 +102,14 @@ public final class AppSettings: SettingsStorage {
         set {
             let value = newValue?.trimmingCharacters(in: .whitespacesAndNewlines)
             defaults.set(value?.isEmpty == true ? nil : value, forKey: "daikinAddress")
+        }
+    }
+
+    public var daikinName: String? {
+        get { defaults.string(forKey: "daikinName") }
+        set {
+            let value = newValue?.trimmingCharacters(in: .whitespacesAndNewlines)
+            defaults.set(value?.isEmpty == true ? nil : value, forKey: "daikinName")
         }
     }
 
@@ -159,6 +168,7 @@ public final class AppSettings: SettingsStorage {
 public final class InMemorySettings: SettingsStorage {
     public var providerKind: ACProviderKind = .thinQ
     public var daikinAddress: String?
+    public var daikinName: String?
     public var daikinKey: String?
     public var token: String?
     public var clientID = "celsius-test"

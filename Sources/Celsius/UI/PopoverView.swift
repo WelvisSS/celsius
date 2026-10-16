@@ -169,7 +169,9 @@ struct PopoverView: View {
     /// Shared by every pop-up button so they line up regardless of the selected value.
     private static let popUpWidth: CGFloat = 96
 
-    private var temperatureEditable: Bool { ACMode.acceptsTargetTemperature(status?.mode) }
+    private var temperatureEditable: Bool {
+        ACMode.acceptsTargetTemperature(status?.mode) && status?.powerful != true
+    }
 
     private var temperatureSlider: some View {
         let enabled = isOn && temperatureEditable
@@ -208,7 +210,8 @@ struct PopoverView: View {
             pickerRow(
                 "Fan speed",
                 options: caps.fanSpeeds.map { (Labels.fan($0), $0) },
-                selection: Binding(get: { status?.fanSpeed ?? "" }, set: { store.perform(.fanSpeed($0)) })
+                selection: Binding(get: { status?.fanSpeed ?? "" }, set: { store.perform(.fanSpeed($0)) }),
+                enabled: status?.powerful != true
             )
             if caps.supportsSwing {
                 pickerRow(
@@ -233,7 +236,7 @@ struct PopoverView: View {
     }
 
     private func pickerRow<Value: Hashable>(
-        _ title: String, options: [(title: String, value: Value)], selection: Binding<Value>
+        _ title: String, options: [(title: String, value: Value)], selection: Binding<Value>, enabled: Bool = true
     ) -> some View {
         HStack {
             Text(title)
@@ -242,6 +245,8 @@ struct PopoverView: View {
             PopUpButton(options: options, selection: selection)
                 .frame(width: Self.popUpWidth)
                 .accessibilityLabel(title)
+                .disabled(!enabled)
+                .opacity(enabled ? 1 : Theme.disabledOpacity)
         }
     }
 
@@ -250,6 +255,11 @@ struct PopoverView: View {
             if caps.supportsEco {
                 CircleToggleRow(systemImage: "leaf", title: "Eco mode", isOn: status?.eco == true) {
                     store.perform(.eco(status?.eco != true))
+                }
+            }
+            if caps.supportsPowerful {
+                CircleToggleRow(systemImage: "bolt.fill", title: "Powerful mode", isOn: status?.powerful == true) {
+                    store.perform(.powerful(status?.powerful != true))
                 }
             }
         }

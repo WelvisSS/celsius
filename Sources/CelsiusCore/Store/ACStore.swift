@@ -170,6 +170,19 @@ public final class ACStore {
     public var capabilities: ACCapabilities { deviceCapabilities.limited(to: temperatureLimits) }
 
     public var configuredDaikinAddress: String? { settings.daikinAddress }
+    public var configuredDaikinName: String? { settings.daikinName }
+
+    public func setDaikinName(_ name: String) {
+        guard providerKind == .daikin else { return }
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        settings.daikinName = trimmed.isEmpty ? nil : trimmed
+        if let device {
+            let renamed = ACDevice(id: device.id, provider: device.provider, modelName: device.modelName,
+                                   displayName: settings.daikinName ?? "Daikin air conditioner")
+            self.device = renamed
+            devices = [renamed]
+        }
+    }
 
     private static func isConfigured(_ settings: SettingsStorage, provider: ACProviderKind) -> Bool {
         switch provider {
@@ -320,6 +333,7 @@ public final class ACStore {
         } else {
             settings.daikinKey = nil
             settings.daikinAddress = nil
+            settings.daikinName = nil
         }
         refreshConfigurationState()
         forgetDevice()
@@ -404,7 +418,7 @@ public final class ACStore {
         case .daikin:
             guard let address = settings.daikinAddress, AppSettings.isValidDaikinAddress(address),
                   let key = settings.daikinKey, !key.isEmpty else { throw DaikinClientError.invalidKey }
-            return try DaikinClient(address: address, key: key)
+            return try DaikinClient(address: address, key: key, displayName: settings.daikinName)
         }
     }
 

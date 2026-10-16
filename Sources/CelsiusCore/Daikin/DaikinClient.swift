@@ -17,16 +17,17 @@ public enum DaikinClientError: Error, LocalizedError, Equatable, Sendable {
 /// Provider for Daikin units on the same local network as this Mac.
 public struct DaikinClient: ACProvider {
     public static let localCapabilities = ACCapabilities(
-        modes: [ACMode.auto, ACMode.dry, ACMode.cool, ACMode.heat, ACMode.fan],
+        modes: [ACMode.auto, ACMode.dry, ACMode.cool, ACMode.fan],
         fanSpeeds: ["LOW", "MID_LOW", "MID", "MID_HIGH", "HIGH", "AUTO", "SILENT"],
-        minTemperature: 18, maxTemperature: 30, temperatureStep: 1,
-        supportsEco: true, supportsSwing: true, supportsSleep: false
+        minTemperature: 18, maxTemperature: 32, temperatureStep: 1,
+        supportsEco: true, supportsSwing: true, supportsSleep: false, supportsPowerful: true
     )
 
     private let key: Data
     private let transport: DaikinLocalTransport
+    private let displayName: String
 
-    public init(address: String, key: String, transport: DaikinLocalTransport? = nil) throws {
+    public init(address: String, key: String, displayName: String? = nil, transport: DaikinLocalTransport? = nil) throws {
         let normalized = key.trimmingCharacters(in: .whitespacesAndNewlines)
         let rawKey = Data(normalized.utf8)
         let decodedKey = Data(base64Encoded: normalized)
@@ -42,10 +43,12 @@ public struct DaikinClient: ACProvider {
         }
         self.key = keyData
         self.transport = transport ?? DaikinLocalTransport(address: address)
+        let trimmedName = displayName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        self.displayName = trimmedName.isEmpty ? "Daikin air conditioner" : trimmedName
     }
 
     public func devices() async throws -> [ACDevice] {
-        [ACDevice(id: "daikin-local", provider: .daikin, displayName: "Daikin air conditioner")]
+        [ACDevice(id: "daikin-local", provider: .daikin, modelName: "FTKP09S5VL", displayName: displayName)]
     }
 
     public func capabilities(deviceID: String) async throws -> ACCapabilities {
@@ -71,6 +74,8 @@ public struct DaikinClient: ACProvider {
             fanSpeed: Self.fanName(fanCode),
             swing: port["v_swing"]?.double.map { $0 == 1 },
             eco: port["econo"]?.double.map { $0 == 1 },
+            powerful: port["powerchill"]?.double.map { $0 == 1 },
+            firmwareVersion: port["fw_ver"]?.string,
             sleepMinutesLeft: nil
         )
     }
@@ -84,7 +89,12 @@ public struct DaikinClient: ACProvider {
         case .targetTemperature(let temperature): fields["temperature"] = .number(temperature)
         case .fanSpeed(let fan): fields["fan"] = .number(Double(try Self.fanCode(fan)))
         case .swing(let on): fields["v_swing"] = .number(on ? 1 : 0)
-        case .eco(let on): fields["econo"] = .number(on ? 1 : 0)
+        case .eco(let on):
+            fields["econo"] = .number(on ? 1 : 0)
+            fields["powerchill"] = .number(0)
+        case .powerful(let on):
+            fields["powerchill"] = .number(on ? 1 : 0)
+            fields["econo"] = .number(0)
         case .sleep: throw DaikinClientError.unsupportedCommand
         }
         let payload = try JSONEncoder().encode(JSONValue.object(["port1": .object(fields)]))
@@ -107,7 +117,7 @@ public struct DaikinClient: ACProvider {
 
     private static func modeName(_ code: Int) -> String {
         switch code {
-        case 0: ACMode.auto
+        case 0, 1: ACMode.auto
         case 2: ACMode.dry
         case 3: ACMode.cool
         case 4: ACMode.heat
@@ -118,7 +128,7 @@ public struct DaikinClient: ACProvider {
 
     private static func modeCode(_ mode: String) throws -> Int {
         switch mode {
-        case ACMode.auto: 0
+        case ACMode.auto: 1
         case ACMode.dry: 2
         case ACMode.cool: 3
         case ACMode.heat: 4
