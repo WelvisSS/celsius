@@ -70,9 +70,9 @@ public struct DaikinClient: ACProvider {
         var fields: [String: JSONValue] = [:]
         switch command {
         case .power(let on): fields["power"] = .number(on ? 1 : 0)
-        case .mode(let mode): fields["mode"] = .number(try Self.modeCode(mode))
+        case .mode(let mode): fields["mode"] = .number(Double(try Self.modeCode(mode)))
         case .targetTemperature(let temperature): fields["temperature"] = .number(temperature)
-        case .fanSpeed(let fan): fields["fan"] = .number(try Self.fanCode(fan))
+        case .fanSpeed(let fan): fields["fan"] = .number(Double(try Self.fanCode(fan)))
         case .swing(let on): fields["v_swing"] = .number(on ? 1 : 0)
         case .eco(let on): fields["econo"] = .number(on ? 1 : 0)
         case .sleep: throw DaikinClientError.unsupportedCommand

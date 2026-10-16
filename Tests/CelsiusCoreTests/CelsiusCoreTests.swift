@@ -471,6 +471,7 @@ private struct StaticACProvider: ACProvider {
     func send(_ command: ACCommand, deviceID: String) async throws {}
 }
 
+@MainActor
 @Suite struct StoreTests {
     private func makeStore(
         state: String, clock: Clock, recorder: RecordedRequests,
@@ -573,6 +574,7 @@ private struct StaticACProvider: ACProvider {
 
     @Test func readInFlightForThePreviousUnitIsDiscardedWhenSwitching() async throws {
         let gate = Gate()
+        let switchWait = Gate()
         let recorder = RecordedRequests()
         let onState = #"{"operation":{"airConOperationMode":"POWER_ON"},"airConJobMode":{"currentJobMode":"COOL"},"temperature":{"currentTemperature":26,"targetTemperature":18,"unit":"C"}}"#
         let otherState = #"{"operation":{"airConOperationMode":"POWER_OFF"},"airConJobMode":{"currentJobMode":"COOL"},"temperature":{"currentTemperature":26,"targetTemperature":25,"unit":"C"}}"#
@@ -598,7 +600,11 @@ private struct StaticACProvider: ACProvider {
         let store = ACStore(
             settings: settings,
             makeClient: { ThinQClient(token: $0, clientID: $1, transport: transport) },
-            now: { Date(timeIntervalSinceReferenceDate: 0) }
+            now: { Date(timeIntervalSinceReferenceDate: 0) },
+            sleep: { _ in
+                switchWait.markRequested()
+                await Task.yield()
+            }
         )
 
         let firstRead = Task { await store.refresh() }
@@ -606,7 +612,7 @@ private struct StaticACProvider: ACProvider {
         #expect(store.device?.id == "d1")
 
         let switching = Task { await store.selectDevice(id: "d2") }
-        try await Task.sleep(for: .milliseconds(20))
+        await switchWait.waitUntilRequested()
         gate.open()
         await firstRead.value
         await switching.value

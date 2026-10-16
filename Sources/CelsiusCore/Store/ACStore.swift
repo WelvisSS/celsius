@@ -173,7 +173,7 @@ public final class ACStore {
 
     private static func isConfigured(_ settings: SettingsStorage, provider: ACProviderKind) -> Bool {
         switch provider {
-        case .thinQ: !(settings.token?.isEmpty ?? true)
+        case .thinQ: return !(settings.token?.isEmpty ?? true)
         case .daikin:
             let keyLength = settings.daikinKey.map { Data($0.utf8).count } ?? 0
             return settings.daikinAddress.map(AppSettings.isValidDaikinAddress) == true && [16, 24, 32].contains(keyLength)
