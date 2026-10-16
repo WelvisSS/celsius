@@ -8,7 +8,7 @@ public enum DaikinClientError: Error, LocalizedError, Equatable, Sendable {
     public var errorDescription: String? {
         switch self {
         case .invalidKey: "Enter the Daikin integration key from the Daikin Smart AC app."
-        case .invalidState: "The Daikin device returned an unreadable state."
+        case .invalidState: "The Daikin response could not be decrypted or read. Check that the Device Key was generated for this air conditioner's Wi-Fi network; firmware compatibility may also be the cause."
         case .unsupportedCommand: "This Daikin function is not supported by the documented local protocol."
         }
     }
