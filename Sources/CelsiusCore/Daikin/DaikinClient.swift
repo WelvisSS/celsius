@@ -28,8 +28,18 @@ public struct DaikinClient: ACProvider {
 
     public init(address: String, key: String, transport: DaikinLocalTransport? = nil) throws {
         let normalized = key.trimmingCharacters(in: .whitespacesAndNewlines)
-        let keyData = Data(normalized.utf8)
-        guard [16, 24, 32].contains(keyData.count) else { throw DaikinClientError.invalidKey }
+        let rawKey = Data(normalized.utf8)
+        let decodedKey = Data(base64Encoded: normalized)
+        let keyData: Data
+        if let decodedKey, [16, 24, 32].contains(decodedKey.count) {
+            // Daikin Smart AC exposes its Device Key as Base64 text. The HA integration
+            // decodes it before AES; retain raw text support for existing local setups.
+            keyData = decodedKey
+        } else if [16, 24, 32].contains(rawKey.count) {
+            keyData = rawKey
+        } else {
+            throw DaikinClientError.invalidKey
+        }
         self.key = keyData
         self.transport = transport ?? DaikinLocalTransport(address: address)
     }
