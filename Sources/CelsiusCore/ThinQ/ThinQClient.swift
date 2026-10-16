@@ -56,7 +56,7 @@ public enum ThinQError: Error, Equatable, Sendable {
 }
 
 /// Client for the official LG ThinQ Connect REST API, authenticated with a Personal Access Token.
-public struct ThinQClient: Sendable {
+public struct ThinQClient: ACProvider {
     public typealias Transport = @Sendable (URLRequest) async throws -> (Data, URLResponse)
 
     /// Brazil is served by the Americas region.
@@ -78,7 +78,11 @@ public struct ThinQClient: Sendable {
         }
     }
 
-    public func devices() async throws -> [ThinQDevice] {
+    public func devices() async throws -> [ACDevice] {
+        try await thinQDevices().map { ACDevice(thinQ: $0) }
+    }
+
+    private func thinQDevices() async throws -> [ThinQDevice] {
         let response = try await perform("GET", "devices")
         let data = try JSONEncoder().encode(response)
         do {
